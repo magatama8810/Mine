@@ -1,51 +1,45 @@
 <?php
 session_start();
 
-$host = 'localhost';
-$dbUser = 'magatama';  
-$dbPass = '8810';  
-$dbName = 'test';         
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
 
-$mysqli = new mysqli($host, $dbUser, $dbPass, $dbName);
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        echo "不正なリクエストです。";
+        exit();
+    }
 
-if ($mysqli->connect_error) {
-    die("接続失敗: " . $mysqli->connect_error);
-}
+    $mysqli = new mysqli('localhost', 'magatama', '8810', 'test');
 
-$user_id = $_SESSION['user_id'];
+    if ($mysqli->connect_error) {
+        die("接続失敗: " . $mysqli->connect_error);
+    }
 
-$comment = htmlspecialchars($_POST['comment'], ENT_QUOTES, 'UTF-8');
-echo $comment;
-var_dump($comment);
+    $comment_text = htmlspecialchars($_POST['comment_text'], ENT_QUOTES, 'UTF-8');
+    $user_id = $_SESSION['user_id'];
 
-$stmt = $mysqli->prepare("INSERT INTO trx_comments (user_id, text) VALUES (?, ?)");
-$stmt->bind_param('is', $user_id, $comment);
+    if (empty($comment_text)) {
+        echo "コメントが空です。";
+        exit();
+    }
 
-// クエリ実行とエラーチェック
-if ($stmt->execute()) {
-    echo "コメントが正常に登録されました。";
+  
+    $stmt = $mysqli->prepare("INSERT INTO trx_comments (user_id, text) VALUES (?, ?)");
+    $stmt->bind_param('is', $user_id, $comment_text);
+
+    if ($stmt->execute()) {
+        header('Location: table.php');
+
+    } else {
+        echo "エラーが発生しました: " . $stmt->error;
+    }
+
+    $stmt->close();
+    $mysqli->close();
+
+
+    unset($_SESSION['csrf_token']);
 } else {
-    echo "エラーが発生しました: " . $stmt->error;
+    echo "ログインが必要です。";
+    exit();
 }
-
-// ステートメントを閉じる
-$stmt->close();
-
-// データベース接続を閉じる
-$mysqli->close();
 ?>
-
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-</head>
-<body>
-    <h2>コメント追加</h2>
-    <form action="comments.php" method="post">
-        コメント: <input type="text" name="comment" required/><br/>
-        <input type="submit" />
-    </form>
-</body>
-</html>
-
